@@ -18,6 +18,14 @@ android {
                 cppFlags ''
             }
         }
+        /**
+         * local.properties 文件中的 ndk.dir 设置已弃用
+            您不应再在应用的 local.properties 文件中设置 ndk.dir 的值，
+            以后的版本中将移除对这项 ndk.dir 设置的支持。Android Gradle 插件会默认设置 NDK 版本，
+            但如果您需要特定版本的 NDK，可以在 build.gradle 中设置 android.ndkVersion。
+            如需详细了解如何设置 NDK，请参阅安装及配置 NDK 和 CMake。
+         */
+        ndkVersion = "21.1.6352462"
     }
 
     buildTypes {
