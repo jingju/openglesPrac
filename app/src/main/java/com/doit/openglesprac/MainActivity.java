@@ -1,36 +1,16 @@
 package com.doit.openglesprac;
 
-import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.NativeActivity;
 import android.os.Bundle;
-import android.widget.TextView;
 
-import com.doit.openglesprac.databinding.ActivityMainBinding;
+public class MainActivity extends NativeActivity {
 
-public class MainActivity extends AppCompatActivity {
-
-    // Used to load the 'openglesprac' library on application startup.
-    static {
-        System.loadLibrary("openglesprac");
-    }
-
-    private ActivityMainBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        // Example of a call to a native method
-        TextView tv = binding.sampleText;
-        tv.setText(stringFromJNI());
+        setContentView(R.layout.activity_main);
     }
 
-    /**
-     * A native method that is implemented by the 'openglesprac' native library,
-     * which is packaged with this application.
-     */
-    public native String stringFromJNI();
 }
