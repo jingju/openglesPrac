@@ -84,13 +84,13 @@ bool EglCore::init(EGLContext sharedContext, int flags) {
     //todo 测试下传参对不对
     eglPresentationTimeAndroid = (EGL_PRESENTATION_TIME_ANDROIDPROC)
             eglGetProcAddress("eglPresentationTimeAndroid");
-    if(!eglPresentationTimeAndroid){
+    if (!eglPresentationTimeAndroid) {
         LOGCATE("eglPresentationTimeAndroid is not availab");
     }
 
     int values[1] = {0};
-    eglQueryContext(mEGLDisplay,mEGLContext,EGL_CONTEXT_CLIENT_VERSION,values);
-    LOGCATE("EGLContext created,client version %d",values[0]);
+    eglQueryContext(mEGLDisplay, mEGLContext, EGL_CONTEXT_CLIENT_VERSION, values);
+    LOGCATE("EGLContext created,client version %d", values[0]);
     return true;
 }
 
@@ -102,7 +102,7 @@ bool EglCore::init(EGLContext sharedContext, int flags) {
  */
 EGLConfig EglCore::getConfig(int flags, int version) {
     int renderableType = EGL_OPENGL_ES2_BIT;
-    if(version >= 3){
+    if (version >= 3) {
         renderableType |= EGL_OPENGL_ES3_BIT_KHR;
     }
     int attribList[] = {
@@ -111,25 +111,180 @@ EGLConfig EglCore::getConfig(int flags, int version) {
             EGL_BLUE_SIZE, 8,
             EGL_ALPHA_SIZE, 8,
             EGL_DEPTH_SIZE, 16,
-            EGL_STENCIL_SIZE,8,
-            EGL_RENDERABLE_TYPE,renderableType,
-            EGL_NONE,0, // placeholder for recordable [@-3]
+            EGL_STENCIL_SIZE, 8,
+            EGL_RENDERABLE_TYPE, renderableType,
+            EGL_NONE, 0, // placeholder for recordable [@-3]
             EGL_NONE
     };
 
     int length = sizeof(attribList) / sizeof(attribList[0]);
-    if((flags & FLAG_RECORDABLE) != 0){
+    if ((flags & FLAG_RECORDABLE) != 0) {
         attribList[length - 3] = EGL_RECORDABLE_ANDROID;
-        attribList[length -2] = 1;
+        attribList[length - 2] = 1;
     }
     EGLConfig configs = NULL;
     int numConfigs;
-    if(!eglChooseConfig(mEGLDisplay,attribList,&configs,1,&numConfigs)){
+    if (!eglChooseConfig(mEGLDisplay, attribList, &configs, 1, &numConfigs)) {
         LOGCATE("unable to find RGB8888 / %d  EGLConfig", version);
         return NULL;
     }
     return configs;
 }
 
+/**
+ * 释放资源
+ */
+void EglCore::release() {
+    if (mEGLDisplay != EGL_NO_DISPLAY) {
+        eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroyContext(mEGLDisplay, mEGLContext);
+        eglReleaseThread();
+        eglTerminate(mEGLDisplay);
+    }
 
+    mEGLDisplay = EGL_NO_DISPLAY;
+    mEGLContext = EGL_NO_CONTEXT;
+    mEGLConfig = NULL;
+}
 
+/**
+ * 获取EGLContext
+ * @return
+ */
+EGLContext EglCore::getEGLContext() {
+    return mEGLContext;
+}
+
+/**
+ * 销毁EGLSurface
+ * @param eglSurface
+ */
+void EglCore::releaseSurface(EGLSurface eglSurface) {
+    eglDestroySurface(mEGLDisplay, eglSurface);
+}
+
+/**
+ * 创建离屏渲染的EGLSurface
+ * @param width
+ * @param height
+ * @return
+ */
+EGLSurface EglCore::createOffscreenSurface(int width, int height) {
+    int surfaceAttribs[] = {
+            EGL_WIDTH, width,
+            EGL_HEIGHT, height,
+            EGL_NONE
+    };
+    EGLSurface eglSurface = eglCreatePbufferSurface(mEGLDisplay, mEGLConfig, surfaceAttribs);
+    assert(eglSurface != NULL);
+    if (eglSurface == NULL) {
+        LOGCATE("Surface was null");
+        return NULL;
+    }
+    return eglSurface;
+}
+
+/**
+ * 切换到当前的上下文
+ * @param eglSurface
+ */
+void EglCore::makeCurrent(EGLSurface eglSurface) {
+    if (mEGLDisplay == EGL_NO_DISPLAY) {
+        LOGCATE("Note: makeCurrent w/o display.\n");
+    }
+    if (!eglMakeCurrent(mEGLDisplay, eglSurface, eglSurface, mEGLContext)) {
+        // TODO 抛出异常
+    }
+}
+
+/**
+ * 切换到某个上下文
+ * @param drawSurface
+ * @param readSurface
+ */
+void EglCore::makeCurrent(EGLSurface drawSurface, EGLSurface readSurface) {
+    if (mEGLDisplay == EGL_NO_DISPLAY) {
+        LOGCATE("Note: makeCurrent w/o display.\n");
+    }
+    if (!eglMakeCurrent(mEGLDisplay, drawSurface, readSurface, mEGLContext)) {
+        // TODO 抛出异常
+    }
+}
+
+/**
+ * 清除当前显示相关
+ */
+void EglCore::makeNothingCurrent() {
+    if (!eglMakeCurrent(mEGLDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
+        // TODO 抛出异常
+    }
+}
+
+/**
+ * 交换显示
+ * @param eglSurface
+ * @return
+ */
+bool EglCore::swapBuffers(EGLSurface eglSurface) {
+    return eglSwapBuffers(mEGLDisplay, eglSurface);
+}
+
+/**
+ * 设置显示时间戳pts
+ * @param eglSurface
+ * @param nsecs
+ */
+void EglCore::setPresentationTime(EGLSurface eglSurface, long nsecs) {
+    eglPresentationTimeAndroid(mEGLDisplay, eglSurface, nsecs);
+}
+
+/**
+ * 是否处于当前上下文
+ * @param eglSurface
+ * @return
+ */
+bool EglCore::isCurrent(EGLSurface eglSurface) {
+    return mEGLContext == eglGetCurrentContext() &&
+           eglSurface == eglGetCurrentSurface(EGL_DRAW);
+}
+
+/**
+ * 查询surface
+ * @param eglSurface
+ * @param what
+ * @return
+ */
+int EglCore::querySurface(EGLSurface eglSurface, int what) {
+    int value;
+    eglQuerySurface(mEGLContext, eglSurface, what, &value);
+    return value;
+}
+
+/**
+ * 查询字符串
+ * @param what
+ * @return
+ */
+const char *EglCore::queryString(int what) {
+    return eglQueryString(mEGLDisplay, what);
+}
+
+/**
+ * 获取GLES版本号
+ * @return
+ */
+int EglCore::getGlVersion() {
+    return mGlVersion;
+}
+
+/**
+* 检查是否出错
+* @param msg
+*/
+void EglCore::checkEglError(const char *msg) {
+    int error;
+    if ((error = eglGetError()) != EGL_SUCCESS) {
+        //TODO
+        LOGCATE("%s: EGL error: %x", msg, error);
+    }
+}

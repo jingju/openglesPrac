@@ -1,7 +1,7 @@
 package com.doit.openglesprac;
 
 /**
- * @author: zgj
+ * @author: Macro
  * @description:
  * @email: zhaoguangju@situdata.com
  * @date: 2023/6/27
